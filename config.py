@@ -48,15 +48,15 @@ RANSAC_CONFIDENCE = 0.999      # RANSAC confidence level
 # ──────────────────────────────────────────────
 SGBM_MIN_DISPARITY = 0
 SGBM_NUM_DISPARITIES = 128     # Must be divisible by 16
-SGBM_BLOCK_SIZE = 5            # Odd number, typically 3-11
-SGBM_P1 = 8 * 3 * 5 ** 2      # Penalty on disparity changes (small)
-SGBM_P2 = 32 * 3 * 5 ** 2     # Penalty on disparity changes (large)
+SGBM_BLOCK_SIZE = 11           # Increased from 5 for smoother, more cohesive disparity
+SGBM_P1 = 8 * 3 * 11 ** 2      # Penalty on disparity changes (small)
+SGBM_P2 = 32 * 3 * 11 ** 2     # Penalty on disparity changes (large)
 SGBM_DISP12_MAX_DIFF = 1       # Max allowed difference in L-R check
-SGBM_UNIQUENESS_RATIO = 10     # Margin in % for best match uniqueness
-SGBM_SPECKLE_WINDOW_SIZE = 100 # Max size of smooth disparity regions
+SGBM_UNIQUENESS_RATIO = 15     # Increased from 10 to reject more ambiguous matches
+SGBM_SPECKLE_WINDOW_SIZE = 200 # Increased from 100 to remove larger isolated noise patches
 SGBM_SPECKLE_RANGE = 2         # Max disparity variation in speckle region
 SGBM_PRE_FILTER_CAP = 63
-SGBM_MODE = 1                  # cv2.StereoSGBM_MODE_SGBM_3WAY
+SGBM_MODE = 2                  # cv2.StereoSGBM_MODE_HH (More accurate than 3WAY)
 
 # WLS Filter parameters
 WLS_LAMBDA = 8000              # Regularization parameter
@@ -100,6 +100,6 @@ RECTIFIED_OUTPUT = os.path.join(OUTPUT_DIR, "rectified.jpg")
 
 # Point cloud filtering
 PC_DEPTH_MIN = 0               # Minimum depth to include (0 = auto)
-PC_DEPTH_MAX = 10000           # Maximum depth to include
-PC_STATISTICAL_OUTLIER_NB = 20 # Neighbors for statistical outlier removal
-PC_STATISTICAL_OUTLIER_STD = 2.0  # Std ratio for outlier removal
+PC_DEPTH_MAX = 5000            # Reduced from 10000 to drop deep background noise
+PC_STATISTICAL_OUTLIER_NB = 50 # Increased from 20 to check more neighbors
+PC_STATISTICAL_OUTLIER_STD = 1.0  # Reduced from 2.0 to be much stricter on outliers

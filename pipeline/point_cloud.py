@@ -51,8 +51,8 @@ def reproject_to_3d(disparity, Q, color_image):
         combined = disp_valid & finite_mask
         z_vals = points_3d[:, :, 2][combined]
         if len(z_vals) > 100:
-            z_low = np.percentile(z_vals, 1)
-            z_high = np.percentile(z_vals, 99)
+            z_low = np.percentile(z_vals, 5)
+            z_high = np.percentile(z_vals, 95)
             z_mask = (points_3d[:, :, 2] >= z_low) & (points_3d[:, :, 2] <= z_high)
         else:
             z_mask = np.abs(points_3d[:, :, 2]) < config.PC_DEPTH_MAX
@@ -71,6 +71,27 @@ def reproject_to_3d(disparity, Q, color_image):
 
     # Convert BGR to RGB and normalize to [0, 1]
     valid_colors = valid_colors[:, ::-1].astype(np.float64) / 255.0
+
+    # -- Normalize point cloud geometry --
+    # With estimated (uncalibrated) camera intrinsics, the Q matrix produces
+    # 3D coordinates where depth (Z) can be on a completely different scale
+    # than X and Y. This creates the "flat billboard" effect where the point
+    # cloud looks correct from the front but collapses when rotated.
+    #
+    # Fix: center the cloud and normalize each axis independently so that
+    # the spatial extent in X, Y, and Z are comparable. This preserves the
+    # relative structure while making depth visually meaningful.
+    if len(valid_points) > 100:
+        centroid = np.median(valid_points, axis=0)
+        valid_points = valid_points - centroid
+
+        # Scale each axis so the interquartile range is normalized
+        for axis in range(3):
+            q25 = np.percentile(valid_points[:, axis], 10)
+            q75 = np.percentile(valid_points[:, axis], 90)
+            iqr = q75 - q25
+            if iqr > 1e-6:
+                valid_points[:, axis] /= iqr
 
     print(f"  Valid 3D points: {len(valid_points)}")
 

@@ -43,7 +43,15 @@ python app.py
 Run `python app.py` to launch an interactive web interface where you can:
 - Upload left/right images
 - View each pipeline step (keypoints, matches, epipolar lines, rectification, disparity, depth)
-- Launch the Open3D 3D viewer
+- **Tune parameters** in real time using sliders:
+  - **Rectification Mode** -- switch between Calibrated (uses estimated K + R, t) and Uncalibrated (uses F + matched points only). Try Uncalibrated if the 3D looks flat.
+  - **Block Size** -- matching window size (larger = smoother, less detail)
+  - **Num Disparities** -- depth search range (increase for wider baselines)
+  - **Uniqueness Ratio** -- match quality threshold
+  - **Speckle Window** -- noise patch removal size
+  - **WLS Lambda / Sigma** -- disparity smoothing strength and edge sensitivity
+  - **Outlier Neighbors / Std Ratio** -- point cloud outlier filtering aggressiveness
+- Launch the **Open3D 3D viewer** to interactively explore the point cloud
 
 > **Note (Wayland):** If Open3D fails to open, run `export XDG_SESSION_TYPE=x11` before launching.
 
@@ -231,7 +239,8 @@ CV_Project/
 2. **Overlap**: Ensure significant overlap (>60%) between views
 3. **Baseline**: The distance between viewpoints should be 5-15% of the distance to the scene
 4. **Avoid**: Pure rotation (translation is needed for depth), textureless surfaces, repetitive patterns
-5. **Tuning**: Adjust `SGBM_NUM_DISPARITIES` and `SGBM_BLOCK_SIZE` in `config.py` for your images
+5. **Tuning**: Use the Parameter Tuning panel in the web UI (`python app.py`) to experiment with settings per image pair
+6. **Rectification**: If the 3D result looks flat or distorted, try switching to Uncalibrated rectification mode
 
 ## Dependencies
 

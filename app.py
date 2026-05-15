@@ -4,7 +4,7 @@
 Interactive web interface for the stereo 3D reconstruction pipeline.
 
 Wraps main.py's run_pipeline() to provide image upload, step-by-step
-visualization, and Open3D 3D point cloud viewing.
+visualization, parameter tuning, and Open3D 3D point cloud viewing.
 
 Usage:
     python app.py
@@ -41,21 +41,46 @@ def bgr_to_rgb(img):
     return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
 
-def run_pipeline_ui(left_img_path, right_img_path, progress=gr.Progress()):
+def run_pipeline_ui(
+    left_img_path, right_img_path,
+    rectification_mode,
+    block_size, num_disparities, uniqueness_ratio,
+    speckle_window, wls_lambda, wls_sigma,
+    outlier_neighbors, outlier_std,
+    progress=gr.Progress(),
+):
     """
-    Run the full 3D reconstruction pipeline via main.py and return all
-    intermediate visualizations plus the PLY path.
+    Run the full 3D reconstruction pipeline with user-tuned parameters.
+    Overrides config values before each run.
     """
     if left_img_path is None or right_img_path is None:
         raise gr.Error("Please upload both left and right images before running.")
+
+    # Override config with slider values
+    config.SGBM_BLOCK_SIZE = int(block_size)
+    config.SGBM_P1 = 8 * 3 * int(block_size) ** 2
+    config.SGBM_P2 = 32 * 3 * int(block_size) ** 2
+    config.SGBM_NUM_DISPARITIES = int(num_disparities)
+    config.SGBM_UNIQUENESS_RATIO = int(uniqueness_ratio)
+    config.SGBM_SPECKLE_WINDOW_SIZE = int(speckle_window)
+    config.WLS_LAMBDA = float(wls_lambda)
+    config.WLS_SIGMA = float(wls_sigma)
+    config.PC_STATISTICAL_OUTLIER_NB = int(outlier_neighbors)
+    config.PC_STATISTICAL_OUTLIER_STD = float(outlier_std)
 
     # Capture stdout from the pipeline for the log
     log_capture = io.StringIO()
 
     progress(0.05, desc="Running pipeline...")
 
+    use_calibrated = (rectification_mode == "Calibrated")
+
     with contextlib.redirect_stdout(log_capture):
-        results = run_pipeline(left_img_path, right_img_path, open_viewer=False)
+        results = run_pipeline(
+            left_img_path, right_img_path,
+            open_viewer=False,
+            use_calibrated=use_calibrated,
+        )
 
     progress(0.95, desc="Preparing outputs...")
 
@@ -202,6 +227,14 @@ CUSTOM_CSS = """
     font-size: 1rem !important;
     font-weight: 500 !important;
 }
+
+/* -- Parameter panel --------------------------------------- */
+.param-panel {
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    border-radius: 14px;
+    padding: 0.8rem;
+    background: rgba(102, 126, 234, 0.03);
+}
 """
 
 CUSTOM_HEAD = """
@@ -244,6 +277,81 @@ def build_ui():
                     height=280,
                     sources=["upload", "clipboard"],
                 )
+
+        # -- Parameter Tuning Panel --------------------------------
+        with gr.Accordion("Parameter Tuning", open=False):
+            gr.HTML(
+                '<p style="opacity:0.6; font-size:0.85rem; margin:0 0 0.5rem;">'
+                'Adjust these to improve reconstruction quality for different images. '
+                'Hover over the <b>?</b> icon on each slider for details.</p>'
+            )
+
+            with gr.Row():
+                with gr.Column(elem_classes="param-panel"):
+                    gr.HTML('<p style="font-weight:600; margin:0 0 0.3rem;">Rectification</p>')
+                    rd_rectify_mode = gr.Radio(
+                        choices=["Calibrated", "Uncalibrated"],
+                        value="Calibrated",
+                        label="Rectification Mode",
+                        info="Calibrated: uses estimated camera intrinsics (K) + recovered pose (R, t). "
+                             "Uncalibrated: uses only the Fundamental matrix + matched points -- "
+                             "try this if the 3D looks flat or distorted.",
+                    )
+
+                    gr.HTML('<p style="font-weight:600; margin:0.8rem 0 0.3rem;">Stereo Matching (SGBM)</p>')
+                    sl_block_size = gr.Slider(
+                        minimum=3, maximum=21, step=2,
+                        value=config.SGBM_BLOCK_SIZE,
+                        label="Block Size",
+                        info="Window size for pixel matching. Larger = smoother but less detail. Use 5-7 for textured scenes, 11-15 for smooth objects.",
+                    )
+                    sl_num_disp = gr.Slider(
+                        minimum=16, maximum=256, step=16,
+                        value=config.SGBM_NUM_DISPARITIES,
+                        label="Num Disparities",
+                        info="Max disparity search range. Increase for wider baselines or closer objects. Must be divisible by 16.",
+                    )
+                    sl_uniqueness = gr.Slider(
+                        minimum=5, maximum=30, step=1,
+                        value=config.SGBM_UNIQUENESS_RATIO,
+                        label="Uniqueness Ratio",
+                        info="How much better the best match must be vs second-best (%). Higher = fewer but more reliable matches.",
+                    )
+                    sl_speckle = gr.Slider(
+                        minimum=50, maximum=500, step=25,
+                        value=config.SGBM_SPECKLE_WINDOW_SIZE,
+                        label="Speckle Window",
+                        info="Max size of isolated noise patches to remove. Larger = more aggressive noise cleanup.",
+                    )
+
+                with gr.Column(elem_classes="param-panel"):
+                    gr.HTML('<p style="font-weight:600; margin:0 0 0.3rem;">WLS Filter (Smoothing)</p>')
+                    sl_wls_lambda = gr.Slider(
+                        minimum=1000, maximum=20000, step=500,
+                        value=config.WLS_LAMBDA,
+                        label="WLS Lambda",
+                        info="Smoothing strength. Higher = smoother disparity map. Lower = preserves more detail but keeps more noise.",
+                    )
+                    sl_wls_sigma = gr.Slider(
+                        minimum=0.5, maximum=3.0, step=0.1,
+                        value=config.WLS_SIGMA,
+                        label="WLS Sigma",
+                        info="Edge sensitivity. Lower = stronger edge preservation. Higher = smoother across edges.",
+                    )
+
+                    gr.HTML('<p style="font-weight:600; margin:0.8rem 0 0.3rem;">Point Cloud Filtering</p>')
+                    sl_outlier_nb = gr.Slider(
+                        minimum=10, maximum=100, step=5,
+                        value=config.PC_STATISTICAL_OUTLIER_NB,
+                        label="Outlier Neighbors",
+                        info="How many neighbors to check for outlier detection. More neighbors = more robust but slower.",
+                    )
+                    sl_outlier_std = gr.Slider(
+                        minimum=0.3, maximum=3.0, step=0.1,
+                        value=config.PC_STATISTICAL_OUTLIER_STD,
+                        label="Outlier Std Ratio",
+                        info="Strictness of outlier removal. Lower = more aggressive (removes more floating points).",
+                    )
 
         # -- Run Button --------------------------------------------
         with gr.Row():
@@ -328,7 +436,13 @@ def build_ui():
         # -- Wiring ------------------------------------------------
         run_btn.click(
             fn=run_pipeline_ui,
-            inputs=[left_input, right_input],
+            inputs=[
+                left_input, right_input,
+                rd_rectify_mode,
+                sl_block_size, sl_num_disp, sl_uniqueness,
+                sl_speckle, sl_wls_lambda, sl_wls_sigma,
+                sl_outlier_nb, sl_outlier_std,
+            ],
             outputs=[
                 out_keypoints,
                 out_matches,

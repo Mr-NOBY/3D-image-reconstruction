@@ -56,7 +56,7 @@ def print_banner():
     print()
 
 
-def run_pipeline(left_path, right_path, open_viewer=True):
+def run_pipeline(left_path, right_path, open_viewer=True, use_calibrated=True):
     """
     Run the full 3D reconstruction pipeline.
     
@@ -64,6 +64,8 @@ def run_pipeline(left_path, right_path, open_viewer=True):
         left_path: Path to left image
         right_path: Path to right image
         open_viewer: Whether to open the Open3D viewer at the end
+        use_calibrated: If True, use calibrated rectification (needs estimated K).
+                        If False, use uncalibrated rectification (F + points only).
     
     Returns:
         dict with all intermediate results
@@ -142,13 +144,24 @@ def run_pipeline(left_path, right_path, open_viewer=True):
     # Stage 5: Stereo Rectification
     # ─────────────────────────────────────────
     print("[5/8] Rectifying stereo pair...")
-    # Always use calibrated rectification since we recovered R, t from the
-    # Essential matrix. This produces a proper Q matrix for 3D reprojection.
-    # (Even with estimated intrinsics, this is far more accurate than the
-    #  uncalibrated path which can't produce a valid Q matrix.)
-    rect_left, rect_right, Q = rectify_calibrated(
-        img_left, img_right, K, None, R, t
-    )
+    if use_calibrated:
+        # Calibrated path: uses estimated K + recovered R, t
+        # Produces a geometrically valid Q matrix from stereoRectify.
+        # Better when K is reasonably accurate.
+        print("  Mode: Calibrated (using estimated K + R, t)")
+        rect_left, rect_right, Q = rectify_calibrated(
+            img_left, img_right, K, None, R, t
+        )
+    else:
+        # Uncalibrated path: uses only F + matched points
+        # Does NOT depend on K accuracy at all. Produces homographies
+        # that make epipolar lines horizontal. Q is approximated separately.
+        # Can be better when K is unreliable (no real calibration data).
+        print("  Mode: Uncalibrated (using F + matched points only)")
+        rect_left, rect_right, H1, H2 = rectify_uncalibrated(
+            img_left, img_right, pts_left, pts_right, F, mask
+        )
+        Q = build_Q_matrix_uncalibrated(img_left.shape, K)
     
     results['rect_left'] = rect_left
     results['rect_right'] = rect_right

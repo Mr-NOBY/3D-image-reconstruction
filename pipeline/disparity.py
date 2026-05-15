@@ -54,7 +54,7 @@ def compute_disparity(rect_left, rect_right):
         speckleWindowSize=config.SGBM_SPECKLE_WINDOW_SIZE,
         speckleRange=config.SGBM_SPECKLE_RANGE,
         preFilterCap=config.SGBM_PRE_FILTER_CAP,
-        mode=cv2.StereoSGBM_MODE_SGBM_3WAY
+        mode=config.SGBM_MODE
     )
 
     # Create right matcher for WLS filter
