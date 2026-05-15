@@ -7,7 +7,6 @@ Usage:
     python main.py
     python main.py --left path/to/left.jpg --right path/to/right.jpg
     python main.py --no-viewer      # Skip Open3D viewer
-    python main.py --web-only       # Only open web viewer
 """
 
 import os
@@ -46,8 +45,6 @@ def parse_args():
                         help="Path to the right image")
     parser.add_argument("--no-viewer", action="store_true",
                         help="Skip Open3D interactive viewer")
-    parser.add_argument("--web-only", action="store_true",
-                        help="Only open web viewer (skip Open3D)")
     return parser.parse_args()
 
 
@@ -87,6 +84,14 @@ def run_pipeline(left_path, right_path, open_viewer=True):
     # ─────────────────────────────────────────
     print("[2/8] Detecting features (SIFT)...")
     kp_left, desc_left, kp_right, desc_right = detect_features_pair(img_left, img_right)
+    
+    # Keypoints visualization
+    kp_vis_left = draw_keypoints(img_left, kp_left, "Left")
+    kp_vis_right = draw_keypoints(img_right, kp_right, "Right")
+    results['keypoints_vis'] = np.hstack([
+        cv2.resize(kp_vis_left, (0, 0), fx=0.5, fy=0.5),
+        cv2.resize(kp_vis_right, (0, 0), fx=0.5, fy=0.5),
+    ])
     print()
     
     # ─────────────────────────────────────────
@@ -233,16 +238,10 @@ def main():
     print_banner()
     args = parse_args()
     
-    open_viewer = not args.no_viewer and not args.web_only
+    open_viewer = not args.no_viewer
     
     try:
         results = run_pipeline(args.left, args.right, open_viewer=open_viewer)
-        
-        # Print web viewer info
-        web_viewer = os.path.join(config.PROJECT_ROOT, "web_viewer", "index.html")
-        if os.path.exists(web_viewer):
-            print(f"  Web viewer: file://{os.path.abspath(web_viewer)}")
-            print("  (Copy the PLY file to web_viewer/ or use the file picker in the viewer)")
         
     except FileNotFoundError as e:
         print(f"\nError: {e}")

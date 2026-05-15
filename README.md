@@ -9,10 +9,10 @@
 pip install -r requirements.txt
 
 # 2. Place your images
-#    images/left.jpg  — first viewpoint
-#    images/right.jpg — second viewpoint
+#    images/left.jpg  -- first viewpoint
+#    images/right.jpg -- second viewpoint
 
-# 3. Run the pipeline
+# 3. Run the pipeline (CLI)
 python main.py
 
 # Run with custom images
@@ -20,6 +20,10 @@ python main.py --left path/to/img1.jpg --right path/to/img2.jpg
 
 # Skip the 3D viewer (just save outputs)
 python main.py --no-viewer
+
+# 4. Or use the Gradio web UI
+python app.py
+# Opens at http://localhost:7860
 ```
 
 ### Output Files
@@ -34,9 +38,14 @@ python main.py --no-viewer
 | `output/point_cloud.ply` | 3D point cloud (viewable in MeshLab, Open3D, or the web viewer) |
 | `output/pipeline_summary.png` | Combined summary of all stages |
 
-### Web Viewer
+### Gradio Web UI
 
-Open `web_viewer/index.html` in a browser and load the generated PLY file to interactively explore the 3D reconstruction.
+Run `python app.py` to launch an interactive web interface where you can:
+- Upload left/right images
+- View each pipeline step (keypoints, matches, epipolar lines, rectification, disparity, depth)
+- Launch the Open3D 3D viewer
+
+> **Note (Wayland):** If Open3D fails to open, run `export XDG_SESSION_TYPE=x11` before launching.
 
 ---
 
@@ -197,7 +206,8 @@ Each point is colored using the corresponding pixel from the original image, pro
 
 ```
 CV_Project/
-├── main.py                      # Main pipeline entry point
+├── main.py                      # CLI pipeline entry point
+├── app.py                       # Gradio web UI
 ├── config.py                    # All tunable parameters
 ├── requirements.txt             # Python dependencies
 ├── pipeline/
@@ -209,10 +219,6 @@ CV_Project/
 │   ├── depth_map.py             # Depth computation
 │   ├── point_cloud.py           # 3D reprojection + PLY export
 │   └── visualization.py         # Open3D viewer + plots
-├── web_viewer/
-│   ├── index.html               # Three.js 3D viewer
-│   ├── style.css                # Viewer styling
-│   └── viewer.js                # Viewer logic
 ├── images/                      # Input stereo pair
 │   ├── left.jpg
 │   └── right.jpg
@@ -233,4 +239,4 @@ CV_Project/
 - **NumPy** — matrix operations
 - **Matplotlib** — 2D visualization
 - **Open3D** — 3D point cloud visualization and export
-- **SciPy** — optional advanced filtering
+- **Gradio** -- interactive web UI
