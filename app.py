@@ -43,7 +43,7 @@ def bgr_to_rgb(img):
 
 def run_pipeline_ui(
     left_img_path, right_img_path,
-    rectification_mode,
+    rectification_mode, disparity_method,
     block_size, num_disparities, uniqueness_ratio,
     speckle_window, wls_lambda, wls_sigma,
     outlier_neighbors, outlier_std,
@@ -74,12 +74,14 @@ def run_pipeline_ui(
     progress(0.05, desc="Running pipeline...")
 
     use_calibrated = (rectification_mode == "Calibrated")
+    disp_method = "raft_stereo" if disparity_method == "RAFT-Stereo" else "sgbm"
 
     with contextlib.redirect_stdout(log_capture):
         results = run_pipeline(
             left_img_path, right_img_path,
             open_viewer=False,
             use_calibrated=use_calibrated,
+            disparity_method=disp_method,
         )
 
     progress(0.95, desc="Preparing outputs...")
@@ -298,6 +300,16 @@ def build_ui():
                              "try this if the 3D looks flat or distorted.",
                     )
 
+                    gr.HTML('<p style="font-weight:600; margin:0.8rem 0 0.3rem;">Disparity Method</p>')
+                    rd_disparity_method = gr.Radio(
+                        choices=["SGBM", "RAFT-Stereo"],
+                        value="SGBM",
+                        label="Disparity Method",
+                        info="SGBM: Classical block matching (fast, tunable). "
+                             "RAFT-Stereo: Deep learning stereo (slower, much denser & more accurate). "
+                             "Requires GPU for reasonable speed.",
+                    )
+
                     gr.HTML('<p style="font-weight:600; margin:0.8rem 0 0.3rem;">Stereo Matching (SGBM)</p>')
                     sl_block_size = gr.Slider(
                         minimum=3, maximum=21, step=2,
@@ -438,7 +450,7 @@ def build_ui():
             fn=run_pipeline_ui,
             inputs=[
                 left_input, right_input,
-                rd_rectify_mode,
+                rd_rectify_mode, rd_disparity_method,
                 sl_block_size, sl_num_disp, sl_uniqueness,
                 sl_speckle, sl_wls_lambda, sl_wls_sigma,
                 sl_outlier_nb, sl_outlier_std,

@@ -63,6 +63,14 @@ WLS_LAMBDA = 8000              # Regularization parameter
 WLS_SIGMA = 1.5                # Sensitivity parameter
 
 # ──────────────────────────────────────────────
+# RAFT-Stereo (Deep Stereo Matching)
+# ──────────────────────────────────────────────
+RAFT_STEREO_MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "raftstereo-middlebury.pth")
+RAFT_STEREO_VALID_ITERS = 32       # Number of refinement iterations (more = better but slower)
+RAFT_STEREO_MAX_HEIGHT = 800       # Resize threshold for VRAM safety
+RAFT_STEREO_MAX_WIDTH = 1200       # Resize threshold for VRAM safety
+
+# ──────────────────────────────────────────────
 # Camera Intrinsics (estimated / default)
 # ──────────────────────────────────────────────
 # These are estimated defaults. For uncalibrated images,

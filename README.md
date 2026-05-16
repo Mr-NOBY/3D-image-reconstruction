@@ -1,6 +1,6 @@
 # 3D Reconstruction from Two Images
 
-> Reconstruct a 3D point cloud and depth map from two images of the same scene taken from different viewpoints using stereo vision and epipolar geometry.
+> Reconstruct a 3D point cloud and depth map from two images of the same scene taken from different viewpoints using stereo vision and epipolar geometry. Supports both classical **StereoSGBM** and deep learning-based **RAFT-Stereo** disparity estimation.
 
 ## Quick Start
 
@@ -43,6 +43,9 @@ python app.py
 Run `python app.py` to launch an interactive web interface where you can:
 - Upload left/right images
 - View each pipeline step (keypoints, matches, epipolar lines, rectification, disparity, depth)
+- **Choose disparity method**:
+  - **SGBM** -- classical Semi-Global Block Matching (fast, tunable)
+  - **RAFT-Stereo** -- deep learning stereo matching (slower, much denser & more accurate, requires GPU)
 - **Tune parameters** in real time using sliders:
   - **Rectification Mode** -- switch between Calibrated (uses estimated K + R, t) and Uncalibrated (uses F + matched points only). Try Uncalibrated if the 3D looks flat.
   - **Block Size** -- matching window size (larger = smoother, less detail)
@@ -62,6 +65,8 @@ Run `python app.py` to launch an interactive web interface where you can:
 ```
 Input Images → Feature Detection → Feature Matching → Epipolar Geometry
     → Stereo Rectification → Disparity Map → Depth Map → 3D Point Cloud
+                              ┌─ StereoSGBM (classical)  ─┐
+                              └─ RAFT-Stereo (deep learning)─┘
 ```
 
 ---
@@ -169,6 +174,10 @@ has the form of a rectified fundamental matrix (epipoles at infinity).
 
 $$d = x_L - x_R$$
 
+Two methods are available for computing the disparity map:
+
+#### Method A: StereoSGBM (Classical)
+
 **StereoSGBM** (Semi-Global Block Matching) minimizes an energy function:
 
 $$E(D) = \sum_p \left( C(p, D_p) + \sum_{q \in N_p} P_1 \cdot T[|D_p - D_q| = 1] + \sum_{q \in N_p} P_2 \cdot T[|D_p - D_q| > 1] \right)$$
@@ -179,6 +188,19 @@ where:
 - $P_2$ — penalty for large disparity changes (depth edges)
 
 The **WLS filter** refines the disparity map by combining left and right disparities with an edge-aware weighted least squares filter.
+
+#### Method B: RAFT-Stereo (Deep Learning)
+
+**RAFT-Stereo** (Lipson et al., 3DV 2021) uses a deep neural network for iterative disparity refinement:
+
+1. **Feature extraction** — multi-scale CNN features are extracted from both images
+2. **Correlation volume** — a 1D correlation volume is built between left and right features along the epipolar line
+3. **Iterative GRU updates** — a recurrent network (ConvGRU) iteratively looks up the correlation volume and refines the disparity field
+4. **Convex upsampling** — the low-resolution disparity is upsampled to full resolution using learned convex combination weights
+
+RAFT-Stereo produces **much denser** disparity maps (100% pixel coverage vs ~73% for SGBM) and handles textureless regions, thin structures, and occlusions far better than classical methods.
+
+> **Note:** RAFT-Stereo requires PyTorch and a GPU for reasonable inference speed (~2s vs ~0.5s for SGBM).
 
 ---
 
@@ -224,9 +246,14 @@ CV_Project/
 │   ├── epipolar_geometry.py     # F/E matrix, camera pose
 │   ├── rectification.py         # Stereo rectification
 │   ├── disparity.py             # StereoSGBM disparity
+│   ├── raft_stereo_wrapper.py   # RAFT-Stereo deep disparity
 │   ├── depth_map.py             # Depth computation
 │   ├── point_cloud.py           # 3D reprojection + PLY export
 │   └── visualization.py         # Open3D viewer + plots
+├── raft_stereo/                 # RAFT-Stereo source (git clone)
+│   └── core/                    # Model architecture + correlation
+├── models/                      # Pretrained weights
+│   └── raftstereo-middlebury.pth
 ├── images/                      # Input stereo pair
 │   ├── left.jpg
 │   └── right.jpg
@@ -241,11 +268,21 @@ CV_Project/
 4. **Avoid**: Pure rotation (translation is needed for depth), textureless surfaces, repetitive patterns
 5. **Tuning**: Use the Parameter Tuning panel in the web UI (`python app.py`) to experiment with settings per image pair
 6. **Rectification**: If the 3D result looks flat or distorted, try switching to Uncalibrated rectification mode
+7. **RAFT-Stereo**: For textureless or challenging scenes, switch to RAFT-Stereo for dramatically denser disparity maps (100% pixel coverage vs ~73% for SGBM)
 
 ## Dependencies
 
+### Core
 - **OpenCV** (with contrib) — feature detection, stereo matching, geometry
 - **NumPy** — matrix operations
 - **Matplotlib** — 2D visualization
 - **Open3D** — 3D point cloud visualization and export
-- **Gradio** -- interactive web UI
+- **SciPy** — interpolation utilities
+- **Gradio** — interactive web UI
+
+### RAFT-Stereo (deep learning disparity)
+- **PyTorch** — deep learning framework (GPU-accelerated)
+- **torchvision** — image transforms
+- **opt-einsum** — optimized tensor contractions
+- **RAFT-Stereo** — cloned from [princeton-vl/RAFT-Stereo](https://github.com/princeton-vl/RAFT-Stereo)
+- **Pretrained weights** — downloaded from the authors' Dropbox (~50MB)

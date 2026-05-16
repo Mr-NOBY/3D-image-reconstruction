@@ -56,7 +56,7 @@ def print_banner():
     print()
 
 
-def run_pipeline(left_path, right_path, open_viewer=True, use_calibrated=True):
+def run_pipeline(left_path, right_path, open_viewer=True, use_calibrated=True, disparity_method="sgbm"):
     """
     Run the full 3D reconstruction pipeline.
     
@@ -66,6 +66,7 @@ def run_pipeline(left_path, right_path, open_viewer=True, use_calibrated=True):
         open_viewer: Whether to open the Open3D viewer at the end
         use_calibrated: If True, use calibrated rectification (needs estimated K).
                         If False, use uncalibrated rectification (F + points only).
+        disparity_method: "sgbm" for classical StereoSGBM, "raft_stereo" for RAFT-Stereo
     
     Returns:
         dict with all intermediate results
@@ -176,8 +177,13 @@ def run_pipeline(left_path, right_path, open_viewer=True, use_calibrated=True):
     # ─────────────────────────────────────────
     # Stage 6: Disparity Map
     # ─────────────────────────────────────────
-    print("[6/8] Computing disparity map (StereoSGBM + WLS)...")
-    disp_raw, disp_filtered = compute_disparity(rect_left, rect_right)
+    if disparity_method == "raft_stereo":
+        print("[6/8] Computing disparity map (RAFT-Stereo)...")
+        from pipeline.raft_stereo_wrapper import compute_disparity_raft
+        disp_raw, disp_filtered = compute_disparity_raft(rect_left, rect_right)
+    else:
+        print("[6/8] Computing disparity map (StereoSGBM + WLS)...")
+        disp_raw, disp_filtered = compute_disparity(rect_left, rect_right)
     results['disparity'] = disp_filtered
     
     # Save disparity visualization
